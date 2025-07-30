@@ -1,0 +1,9 @@
+.swagger-ui .topbar {
+  background-color: #0c2d48;
+}
+
+.swagger-ui .topbar img {
+  content: url("logo.png");
+  height: 40px;
+  width: auto;
+}

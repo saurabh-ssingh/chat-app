@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Chat App</title>
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body>
+<h2>WebSocket Chat App</h2>
+
+<div>
+  <label>Your Username: <input id="me"/></label>
+  <button onclick="connect()">Connect</button>
+</div>
+
+<div>
+  <label>Send To (comma separated): <input id="receivers"/></label>
+</div>
+
+<div>
+  <input id="msg" placeholder="Type a message..."/>
+  <button onclick="sendMsg()">Send</button>
+</div>
+
+<hr/>
+<ul id="log"></ul>
+
+<script>
+  let stompClient;
+  let me;
+
+  function connect() {
+  me = document.getElementById('me').value.trim();
+  if (!me) {
+    alert("Please enter a username");
+    return;
+  }
+
+  const socket = new SockJS('/ws');
+  stompClient = Stomp.over(socket);
+
+  stompClient.connect({}, () => {
+    log(`Connected as ${me}`);
+    stompClient.subscribe(`/user/${me}/queue/messages`, (frame) => {
+      const message = JSON.parse(frame.body);
+      log(`${message.sender}: ${message.content}`);
+    });
+  });
+
+  // auto-load conversation if receiver already filled
+  const receiver = document.getElementById('receivers').value.trim();
+  if (receiver) {
+    loadConversation(me, receiver);
+  }
+}
+
+
+  function sendMsg() {
+    const receivers = document.getElementById('receivers').value
+                          .split(',')
+                          .map(r => r.trim())
+                          .filter(Boolean);
+    const content = document.getElementById('msg').value.trim();
+
+    if (!receivers.length || !content) {
+      alert("Please enter receivers and a message");
+      return;
+    }
+
+    const chatMessage = {
+      sender: me,
+      receivers: receivers,
+      content: content
+    };
+
+    stompClient.send("/app/chat", {}, JSON.stringify(chatMessage));
+    log(`You: ${content}`);
+    document.getElementById('msg').value = '';
+  }
+
+    // 🆕 Add loadConversation here
+  async function loadConversation(u1, u2, page=0, size=20) {
+    const res = await fetch(`/api/messages/conversation/${u1}/${u2}?page=${page}&size=${size}`);
+    const body = await res.json();
+    // clear old messages
+    document.getElementById('log').innerHTML = '';
+    // show historical messages
+    body.data.content.reverse().forEach(m => log(`${m.sender}: ${m.content}`));
+  }
+
+  // Button click handler to call loadConversation
+  function loadHistory() {
+    const receivers = document.getElementById('receivers').value.split(',')[0].trim();
+    if (!receivers) {
+      alert("Enter one receiver to load conversation");
+      return;
+    }
+    loadConversation(me, receivers);
+  }
+
+  function log(message) {
+    const logEl = document.getElementById('log');
+    const li = document.createElement('li');
+    li.textContent = message;
+    logEl.appendChild(li);
+  }
+</script>
+</body>
+</html>
